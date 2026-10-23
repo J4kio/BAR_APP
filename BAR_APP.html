@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control de Bar</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#181b22; --panel2:#1f232c; --line:#2b303b;
+  --txt:#eef0f4; --mut:#8c93a3; --acc:#f5a524; --ok:#22c55e; --bad:#ef4444; --blue:#3b82f6;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px}
+body{min-height:100vh;padding-bottom:40px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:10px 14px;background:var(--panel2);border:1px solid var(--line);transition:.15s}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:#1a1200;font-weight:700;border-color:var(--acc)}
+button.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+button.ok{background:var(--ok);color:#04210f;font-weight:700;border-color:var(--ok)}
+button.small{padding:6px 10px;font-size:13px}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+input:focus,select:focus{outline:2px solid var(--acc);border-color:transparent}
+
+header{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;max-width:1300px;margin:0 auto}
+.brand{font-weight:800;font-size:18px;display:flex;gap:8px;align-items:center}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:120px}
+.kpi small{display:block;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.kpi b{font-size:17px}
+.kpi.big b{color:var(--acc)}
+nav{display:flex;gap:6px;padding:0 16px 10px;max-width:1300px;margin:0 auto;overflow-x:auto}
+nav button{white-space:nowrap}
+nav button.on{background:var(--acc);color:#1a1200;border-color:var(--acc);font-weight:700}
+
+main{max-width:1300px;margin:0 auto;padding:16px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bar h2{font-size:18px}
+.muted{color:var(--mut)}
+
+.tables{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.table{background:var(--panel);border:2px solid var(--line);border-radius:var(--r);padding:14px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:6px;min-height:140px}
+.table:hover{transform:translateY(-2px)}
+.table.busy{border-color:var(--ok);background:linear-gradient(180deg,rgba(34,197,94,.10),var(--panel))}
+.table .n{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px}
+.badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--panel2);color:var(--mut)}
+.busy .badge{background:rgba(34,197,94,.18);color:var(--ok)}
+.table .tot{font-size:20px;font-weight:800;color:var(--acc)}
+.table .ws{font-size:12px;color:var(--mut);line-height:1.35}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{font-size:16px;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:14px}
+.row b{font-weight:700}
+.big-num{font-size:26px;font-weight:800;color:var(--acc);margin:6px 0}
+
+form.inline{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+form.inline input{flex:1;min-width:140px}
+form.inline input.price{max-width:160px}
+
+.list{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .l{display:flex;flex-direction:column;min-width:0}
+.item .l small{color:var(--mut)}
+.item .r{display:flex;gap:6px;align-items:center;flex-shrink:0}
+
+details.h{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;padding:12px 14px}
+details.h summary{cursor:pointer;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;list-style:none}
+details.h summary::-webkit-details-marker{display:none}
+details.h table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+details.h td,details.h th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+details.h td.r,details.h th.r{text-align:right}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px}
+.overlay.show{display:flex}
+.modal{background:var(--bg);border:1px solid var(--line);border-radius:18px;width:100%;max-width:1050px;margin:auto}
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);border-radius:18px 18px 0 0;z-index:2}
+.mhead h2{font-size:20px}
+.mhead .t{font-size:22px;font-weight:800;color:var(--acc)}
+.mbody{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;padding:16px}
+.mbody h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 8px}
+.sec{margin-bottom:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 12px;border-radius:99px;font-size:14px}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.chip.sell{background:var(--acc);border-color:var(--acc);color:#1a1200;font-weight:700}
+.prods{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:340px;overflow-y:auto;padding:2px}
+.prod{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px}
+.prod b{font-size:14px}
+.prod span{color:var(--acc);font-size:13px}
+.acc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;position:sticky;top:70px}
+.acc .empty{color:var(--mut);padding:16px 0;text-align:center}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{padding:2px 9px;font-size:16px;line-height:1.4}
+.total-line{display:flex;justify-content:space-between;align-items:center;font-size:22px;font-weight:800;padding-top:12px;margin-top:8px;border-top:2px solid var(--line)}
+.total-line span:last-child{color:var(--acc)}
+.split{font-size:13px;color:var(--mut);margin-top:8px}
+.split div{display:flex;justify-content:space-between;padding:2px 0}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.actions button{flex:1}
+.pay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--acc);padding:10px 16px;border-radius:12px;z-index:99;opacity:0;pointer-events:none;transition:.25s}
+.toast.show{opacity:1}
+
+@media(max-width:800px){
+  .mbody{grid-template-columns:1fr}
+  .acc{position:static}
+  .overlay{padding:0}
+  .modal{border-radius:0;min-height:100vh}
+  .mhead{border-radius:0}
+  .kpi{flex:1;min-width:100px}
+  .tables{grid-template-columns:repeat(2,1fr)}
+}
+@media(min-width:801px) and (max-width:1100px){
+  .tables{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="top">
+    <div class="brand">🍺 Control de Bar <span class="muted" id="clock" style="font-weight:400;font-size:13px"></span></div>
+    <div class="kpis">
+      <div class="kpi"><small>Mesas abiertas</small><b id="kOpenCount">0</b></div>
+      <div class="kpi"><small>En cuentas abiertas</small><b id="kOpen">$0</b></div>
+      <div class="kpi"><small>Cobrado (cerradas)</small><b id="kClosed">$0</b></div>
+      <div class="kpi big"><small>Total vendido hoy</small><b id="kTotal">$0</b></div>
+    </div>
+  </div>
+  <nav id="nav">
+    <button data-tab="mesas" class="on">🪑 Mesas</button>
+    <button data-tab="meseros">🧑‍🍳 Meseros</button>
+    <button data-tab="carta">📋 Carta</button>
+    <button data-tab="historial">🧾 Historial</button>
+  </nav>
+</header>
+
+<main id="view"></main>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Utilidades ---------- */
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const COP = new Intl.NumberFormat('es-CO', {style:'currency', currency:'COP', maximumFractionDigits:0});
+  const money = n => COP.format(n || 0);
+  const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'}) : '';
+  const fmtDT = ts => new Date(ts).toLocaleString('es-CO', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+  const elapsed = ts => {
+    if (!ts) return '';
+    const m = Math.floor((Date.now() - ts) / 60000);
+    return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  };
+
+  /* ---------- Estado ---------- */
+  const KEY = 'barControl.v1';
+  const DEFAULT_MENU = [
+    ['Cerveza nacional', 6000, 'Cervezas'], ['Cerveza importada', 12000, 'Cervezas'], ['Jarra de cerveza', 28000, 'Cervezas'],
+    ['Aguardiente (trago)', 7000, 'Licores'], ['Media de aguardiente', 55000, 'Licores'], ['Botella de ron', 120000, 'Licores'],
+    ['Botella de whisky', 220000, 'Licores'], ['Cóctel de la casa', 18000, 'Cócteles'], ['Mojito', 20000, 'Cócteles'],
+    ['Gaseosa', 4500, 'Sin alcohol'], ['Agua', 3500, 'Sin alcohol'], ['Hamburguesa', 24000, 'Comida'],
+    ['Nachos', 20000, 'Comida'], ['Picada', 48000, 'Comida'], ['Alitas x8', 26000, 'Comida']
+  ].map(([name, price, cat]) => ({id: uid(), name, price, cat}));
+
+  const DEFAULT_WAITERS = ['Mesero 1', 'Mesero 2', 'Mesero 3'].map(name => ({id: uid(), name}));
+
+  let S = load();
+  let ui = {tab:'mesas', modal:null, seller:null, closing:false, search:''};
+
+  function newTable(n){ return {n, waiters:[], items:[], openedAt:null}; }
+  function normalize(st){
+    const count = st.tableCount || 20;
+    st.tables = st.tables || [];
+    st.tables = st.tables.slice(0, count);
+    for (let i = st.tables.length; i < count; i++) st.tables.push(newTable(i + 1));
+    st.tableCount = count;
+    return st;
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return normalize(JSON.parse(raw));
+    } catch(e){}
+    return normalize({tableCount:20, waiters:DEFAULT_WAITERS, menu:DEFAULT_MENU, tables:[], history:[], shiftStart:Date.now()});
+  }
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){ toast('No se pudo guardar en el navegador'); }
+  }
+
+  /* ---------- Cálculos ---------- */
+  const itemsTotal = items => items.reduce((a, i) => a + i.price * i.qty, 0);
+  const tableTotal = t => itemsTotal(t.items);
+  const isBusy = t => t.waiters.length > 0 || t.items.length > 0;
+  const waiterName = id => (S.waiters.find(w => w.id === id) || {}).name || 'Ex-mesero';
+
+  function totals(){
+    const open = S.tables.reduce((a, t) => a + tableTotal(t), 0);
+    const closed = S.history.reduce((a, h) => a + h.total, 0);
+    return {open, closed, all: open + closed, openCount: S.tables.filter(isBusy).length};
+  }
+  function waiterStats(){
+    const m = {};
+    S.waiters.forEach(w => m[w.id] = {open:0, closed:0, items:0, tables:[]});
+    S.tables.forEach(t => {
+      t.items.forEach(i => { if (m[i.waiterId]) { m[i.waiterId].open += i.price * i.qty; m[i.waiterId].items += i.qty; } });
+      t.waiters.forEach(id => { if (m[id]) m[id].tables.push(t.n); });
+    });
+    S.history.forEach(h => h.items.forEach(i => { if (m[i.waiterId]) { m[i.waiterId].closed += i.price * i.qty; m[i.waiterId].items += i.qty; } }));
+    return m;
+  }
+
+  /* ---------- Toast ---------- */
+  let toastT;
+  function toast(msg){
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ---------- Render: cabecera ---------- */
+  function renderKpis(){
+    const t = totals();
+    $('#kOpenCount').textContent = t.openCount + ' / ' + S.tableCount;
+    $('#kOpen').textContent = money(t.open);
+    $('#kClosed').textContent = money(t.closed);
+    $('#kTotal').textContent = money(t.all);
+  }
+
+  /* ---------- Render: vistas ---------- */
+  function renderView(){
+    document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+    const v = $('#view');
+    if (ui.tab === 'mesas') v.innerHTML = viewMesas();
+    else if (ui.tab === 'meseros') v.innerHTML = viewMeseros();
+    else if (ui.tab === 'carta') v.innerHTML = viewCarta();
+    else v.innerHTML = viewHistorial();
+  }
+
+  function viewMesas(){
+    const cards = S.tables.map(t => {
+      const busy = isBusy(t);
+      const ws = t.waiters.map(waiterName).join(', ');
+      const units = t.items.reduce((a, i) => a + i.qty, 0);
+      return `<button class="table ${busy ? 'busy' : ''}" data-a="openTable" data-n="${t.n}">
+        <div class="n"><span>Mesa ${t.n}</span><span class="badge">${busy ? 'Ocupada' : 'Libre'}</span></div>
+        <div class="tot">${money(tableTotal(t))}</div>
+        <div class="ws">${busy ? (ws ? '🧑‍🍳 ' + esc(ws) : '<i>Sin mesero</i>') : 'Toca para abrir'}</div>
+        ${busy ? `<div class="ws">${units} productos · ${elapsed(t.openedAt)}</div>` : ''}
+      </button>`;
+    }).join('');
+    return `<div class="bar"><h2>Mesas</h2>
+      <button class="small" data-a="setTables">⚙️ Cantidad de mesas (${S.tableCount})</button></div>
+      <div class="tables">${cards}</div>`;
+  }
+
+  function viewMeseros(){
+    const st = waiterStats();
+    const cards = S.waiters.map(w => {
+      const s = st[w.id];
+      return `<div class="card">
+        <h3><span>${esc(w.name)}</span><button class="danger small" data-a="delWaiter" data-id="${w.id}">Eliminar</button></h3>
+        <div class="big-num">${money(s.open + s.closed)}</div>
+        <div class="row"><span class="muted">En mesas abiertas</span><b>${money(s.open)}</b></div>
+        <div class="row"><span class="muted">En mesas cerradas</span><b>${money(s.closed)}</b></div>
+        <div class="row"><span class="muted">Productos vendidos</span><b>${s.items}</b></div>
+        <div class="row"><span class="muted">Mesas asignadas</span><b>${s.tables.length ? s.tables.join(', ') : '—'}</b></div>
+      </div>`;
+    }).join('');
+    return `<div class="bar"><h2>Meseros</h2></div>
+      <form class="inline" data-form="addWaiter">
+        <input name="name" placeholder="Nombre del nuevo mesero" required maxlength="40">
+        <button class="primary">+ Agregar mesero</button>
+      </form>
+      <div class="cards">${cards || '<p class="muted">Aún no hay meseros.</p>'}</div>`;
+  }
+
+  function viewCarta(){
+    const rows = S.menu.map(p => `<div class="item">
+      <div class="l"><b>${esc(p.name)}</b><small>${esc(p.cat || 'General')}</small></div>
+      <div class="r"><b>${money(p.price)}</b>
+        <button class="small" data-a="editProduct" data-id="${p.id}">Editar</button>
+        <button class="small danger" data-a="delProduct" data-id="${p.id}">✕</button></div>
+    </div>`).join('');
+    return `<div class="bar"><h2>Carta / productos</h2></div>
+      <form class="inline" data-form="addProduct">
+        <input name="name" placeholder="Producto" required maxlength="50">
+        <input name="cat" placeholder="Categoría (opcional)" maxlength="30">
+        <input class="price" name="price" type="number" min="0" step="100" placeholder="Precio" required>
+        <button class="primary">+ Agregar</button>
+      </form>
+      <div class="list">${rows || '<div class="item muted">Sin productos.</div>'}</div>`;
+  }
+
+  function viewHistorial(){
+    const t = totals();
+    const list = [...S.history].reverse().map(h => `<details class="h">
+      <summary><b>Mesa ${h.table} · ${fmtDT(h.closedAt)}</b>
+        <span class="muted">${esc(h.waiters.join(', ') || '—')} · ${esc(h.method)}</span>
+        <b style="color:var(--acc)">${money(h.total)}</b></summary>
+      <table><tr><th>Producto</th><th>Mesero</th><th class="r">Cant.</th><th class="r">Subtotal</th></tr>
+      ${h.items.map(i => `<tr><td>${esc(i.name)}</td><td>${esc(i.waiterName)}</td><td class="r">${i.qty}</td><td class="r">${money(i.price * i.qty)}</td></tr>`).join('')}
+      </table></details>`).join('');
+    return `<div class="bar"><h2>Historial de la jornada</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="small" data-a="exportCSV">⬇️ Exportar CSV</button>
+        <button class="small danger" data-a="newShift">Nueva jornada</button></div></div>
+      <p class="muted" style="margin-bottom:12px">Jornada iniciada ${fmtDT(S.shiftStart)} · ${S.history.length} mesas cerradas · ${money(t.closed)} cobrado</p>
+      ${list || '<p class="muted">Todavía no se ha cerrado ninguna mesa.</p>'}`;
+  }
+
+  /* ---------- Modal de mesa ---------- */
+  const curTable = () => S.tables.find(t => t.n === ui.modal);
+
+  function openModal(n){
+    ui.modal = n; ui.closing = false; ui.search = '';
+    const t = curTable();
+    ui.seller = t.waiters[0] || null;
+    $('#modal').innerHTML = `
+      <div class="mhead"><h2>Mesa ${n}</h2><span class="t" id="mTotal"></span><button data-a="closeModal">✕ Cerrar ventana</button></div>
+      <div class="mbody">
+        <div>
+          <div class="sec"><h3>1 · Meseros de esta mesa</h3><div class="chips" id="mWaiters"></div></div>
+          <div class="sec"><h3>2 · Vendido por (quién registra el producto)</h3><div class="chips" id="mSellers"></div></div>
+          <div class="sec"><h3>3 · Agregar productos</h3>
+            <input id="mSearch" placeholder="Buscar en la carta…" autocomplete="off" style="margin-bottom:8px">
+            <div class="prods" id="mProds"></div>
+            <form class="inline" data-form="custom" style="margin-top:10px">
+              <input name="name" placeholder="Otro producto" maxlength="50" required>
+              <input class="price" name="price" type="number" min="0" step="100" placeholder="Precio" required>
+              <button>+ Agregar</button>
+            </form>
+          </div>
+        </div>
+        <div><div class="acc" id="mAcc"></div></div>
+      </div>`;
+    $('#overlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+    renderProds(); updateModal();
+  }
+  function closeModal(){
+    ui.modal = null; ui.closing = false;
+    $('#overlay').classList.remove('show');
+    document.body.style.overflow = '';
+    refresh();
+  }
+
+  function renderProds(){
+    const q = ui.search.trim().toLowerCase();
+    const list = S.menu.filter(p => !q || p.name.toLowerCase().includes(q) || (p.cat || '').toLowerCase().includes(q));
+    $('#mProds').innerHTML = list.map(p => `<button class="prod" data-a="addProd" data-id="${p.id}"><b>${esc(p.name)}</b><span>${money(p.price)}</span></button>`).join('')
+      || '<span class="muted">Sin resultados</span>';
+  }
+
+  function updateModal(){
+    const t = curTable(); if (!t) return;
+    $('#mTotal').textContent = money(tableTotal(t));
+
+    $('#mWaiters').innerHTML = S.waiters.map(w =>
+      `<button class="chip ${t.waiters.includes(w.id) ? 'on' : ''}" data-a="toggleW" data-id="${w.id}">${t.waiters.includes(w.id) ? '✓ ' : ''}${esc(w.name)}</button>`
+    ).join('') || '<span class="muted">Agrega meseros en la pestaña Meseros</span>';
+
+    $('#mSellers').innerHTML = t.waiters.length
+      ? t.waiters.map(id => `<button class="chip ${ui.seller === id ? 'sell' : ''}" data-a="seller" data-id="${id}">${esc(waiterName(id))}</button>`).join('')
+      : '<span class="muted">Asigna al menos un mesero arriba</span>';
+
+    // Cuenta
+    const byW = {};
+    t.items.forEach(i => byW[i.waiterName] = (byW[i.waiterName] || 0) + i.price * i.qty);
+    const items = t.items.map(i => `<div class="item" style="padding:8px 0">
+      <div class="l"><b>${esc(i.name)}</b><small>${money(i.price)} · ${esc(i.waiterName)}</small></div>
+      <div class="r"><div class="qty"><button data-a="dec" data-id="${i.id}">−</button><b>${i.qty}</b><button data-a="inc" data-id="${i.id}">+</button></div>
+        <b style="min-width:80px;text-align:right">${money(i.price * i.qty)}</b></div>
+    </div>`).join('');
+
+    let foot;
+    if (ui.closing) {
+      foot = `<p style="margin-top:12px"><b>¿Cómo pagó la mesa?</b></p>
+        <div class="pay">
+          <button class="ok" data-a="doClose" data-m="Efectivo">💵 Efectivo</button>
+          <button class="ok" data-a="doClose" data-m="Tarjeta">💳 Tarjeta</button>
+          <button class="ok" data-a="doClose" data-m="Transferencia">📲 Transf.</button>
+        </div>
+        <div class="actions"><button data-a="cancelClose">Cancelar</button></div>`;
+    } else {
+      foot = `<div class="actions">
+        <button class="ok" data-a="askClose" ${t.items.length ? '' : 'disabled style="opacity:.4"'}>✔ Cerrar mesa</button>
+        <button class="danger" data-a="clearTable">${t.items.length ? 'Anular cuenta' : 'Liberar mesa'}</button></div>`;
+    }
+
+    $('#mAcc').innerHTML = `<h3>Cuenta · Mesa ${t.n}${t.openedAt ? ' · abierta ' + fmtTime(t.openedAt) : ''}</h3>
+      ${items || '<div class="empty">Aún no hay productos registrados</div>'}
+      <div class="total-line"><span>Total</span><span>${money(tableTotal(t))}</span></div>
+      ${Object.keys(byW).length ? `<div class="split">${Object.entries(byW).map(([n, v]) => `<div><span>${esc(n)}</span><span>${money(v)}</span></div>`).join('')}</div>` : ''}
+      ${foot}`;
+  }
+
+  function refresh(){
+    renderKpis();
+    if (ui.modal === null) renderView(); else updateModal();
+  }
+
+  /* ---------- Acciones ---------- */
+  function touch(t){ if (!t.openedAt) t.openedAt = Date.now(); }
+
+  function addItem(t, base){
+    if (!t.waiters.length) return toast('Primero asigna un mesero a la mesa');
+    if (!t.waiters.includes(ui.seller)) ui.seller = t.waiters[0];
+    touch(t);
+    const same = t.items.find(i => i.pid === base.pid && i.price === base.price && i.name === base.name && i.waiterId === ui.seller);
+    if (same) same.qty++;
+    else t.items.push({id: uid(), pid: base.pid || null, name: base.name, price: base.price, qty: 1, waiterId: ui.seller, waiterName: waiterName(ui.seller), at: Date.now()});
+    save(); refresh();
+  }
+
+  const actions = {
+    openTable: el => openModal(+el.dataset.n),
+    closeModal,
+    toggleW(el){
+      const t = curTable(), id = el.dataset.id;
+      if (t.waiters.includes(id)) {
+        if (t.items.some(i => i.waiterId === id)) return toast('Ese mesero ya tiene ventas en esta mesa');
+        t.waiters = t.waiters.filter(x => x !== id);
+        if (ui.seller === id) ui.seller = t.waiters[0] || null;
+      } else {
+        t.waiters.push(id);
+        if (!ui.seller) ui.seller = id;
+        touch(t);
+      }
+      save(); refresh();
+    },
+    seller(el){ ui.seller = el.dataset.id; updateModal(); },
+    addProd(el){
+      const p = S.menu.find(x => x.id === el.dataset.id);
+      if (p) addItem(curTable(), {pid: p.id, name: p.name, price: p.price});
+    },
+    inc(el){ const i = curTable().items.find(x => x.id === el.dataset.id); if (i){ i.qty++; save(); refresh(); } },
+    dec(el){
+      const t = curTable(), i = t.items.find(x => x.id === el.dataset.id);
+      if (!i) return;
+      i.qty--; if (i.qty <= 0) t.items = t.items.filter(x => x !== i);
+      save(); refresh();
+    },
+    askClose(){ ui.closing = true; updateModal(); },
+    cancelClose(){ ui.closing = false; updateModal(); },
+    doClose(el){
+      const t = curTable();
+      if (!t.items.length) return;
+      S.history.push({
+        id: uid(), table: t.n, openedAt: t.openedAt, closedAt: Date.now(),
+        waiters: t.waiters.map(waiterName), method: el.dataset.m,
+        items: t.items.map(i => ({...i})), total: tableTotal(t)
+      });
+      const total = tableTotal(t), n = t.n;
+      S.tables[S.tables.indexOf(t)] = newTable(n);
+      save(); closeModal();
+      toast(`Mesa ${n} cerrada · ${money(total)}`);
+    },
+    clearTable(){
+      const t = curTable();
+      if (t.items.length && !confirm(`¿Anular la cuenta de la mesa ${t.n}? Se perderán ${money(tableTotal(t))} sin cobrar.`)) return;
+      S.tables[S.tables.indexOf(t)] = newTable(t.n);
+      save(); closeModal();
+    },
+    delWaiter(el){
+      const w = S.waiters.find(x => x.id === el.dataset.id);
+      if (!w) return;
+      if (S.tables.some(t => t.waiters.includes(w.id))) return toast('Ese mesero está asignado a una mesa abierta');
+      if (!confirm(`¿Eliminar a ${w.name}? Sus ventas pasadas se conservan en el historial.`)) return;
+      S.waiters = S.waiters.filter(x => x.id !== w.id);
+      save(); refresh();
+    },
+    editProduct(el){
+      const p = S.menu.find(x => x.id === el.dataset.id); if (!p) return;
+      const name = prompt('Nombre del producto:', p.name); if (name === null) return;
+      const price = prompt('Precio:', p.price); if (price === null) return;
+      const n = Math.max(0, parseInt(price, 10));
+      if (!name.trim() || isNaN(n)) return toast('Datos no válidos');
+      p.name = name.trim(); p.price = n; save(); refresh();
+    },
+    delProduct(el){
+      const p = S.menu.find(x => x.id === el.dataset.id);
+      if (p && confirm(`¿Quitar "${p.name}" de la carta?`)) { S.menu = S.menu.filter(x => x !== p); save(); refresh(); }
+    },
+    setTables(){
+      const v = prompt('¿Cuántas mesas tiene el bar? (1–60)', S.tableCount);
+      if (v === null) return;
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1 || n > 60) return toast('Número no válido');
+      const lost = S.tables.slice(n).filter(isBusy);
+      if (lost.length) return toast('Cierra primero las mesas ocupadas que quieres quitar');
+      S.tableCount = n; S = normalize(S); save(); refresh();
+    },
+    exportCSV(){
+      if (!S.history.length) return toast('No hay mesas cerradas para exportar');
+      const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+      const rows = [['Cierre','Mesa','Mesero','Producto','Cantidad','Precio','Subtotal','Pago']];
+      S.history.forEach(h => h.items.forEach(i => rows.push([
+        new Date(h.closedAt).toLocaleString('es-CO'), h.table, i.waiterName, i.name, i.qty, i.price, i.price * i.qty, h.method])));
+      const csv = '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+      a.download = 'ventas-' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click(); URL.revokeObjectURL(a.href);
+    },
+    newShift(){
+      if (S.tables.some(isBusy)) return toast('Cierra todas las mesas antes de iniciar una nueva jornada');
+      if (!confirm('¿Iniciar nueva jornada? Se borrará el historial actual. Exporta el CSV antes si lo necesitas.')) return;
+      S.history = []; S.shiftStart = Date.now(); save(); refresh();
+    }
+  };
+
+  /* ---------- Eventos ---------- */
+  document.addEventListener('click', e => {
+    const tab = e.target.closest('[data-tab]');
+    if (tab) { ui.tab = tab.dataset.tab; return refresh(); }
+    if (e.target === $('#overlay')) return closeModal();
+    const el = e.target.closest('[data-a]');
+    if (el && actions[el.dataset.a]) actions[el.dataset.a](el);
+  });
+
+  document.addEventListener('input', e => {
+    if (e.target.id === 'mSearch') { ui.search = e.target.value; renderProds(); }
+  });
+
+  document.addEventListener('submit', e => {
+    const f = e.target.closest('[data-form]'); if (!f) return;
+    e.preventDefault();
+    const d = new FormData(f), kind = f.dataset.form;
+    const name = (d.get('name') || '').trim();
+    if (!name) return;
+    if (kind === 'addWaiter') {
+      S.waiters.push({id: uid(), name}); toast('Mesero agregado');
+    } else if (kind === 'addProduct') {
+      S.menu.push({id: uid(), name, price: Math.max(0, parseInt(d.get('price'), 10) || 0), cat: (d.get('cat') || '').trim() || 'General'});
+      toast('Producto agregado');
+    } else if (kind === 'custom') {
+      const price = Math.max(0, parseInt(d.get('price'), 10) || 0);
+      f.reset(); return addItem(curTable(), {pid: null, name, price});
+    }
+    save(); refresh(); f.reset();
+  });
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.modal !== null) closeModal(); });
+
+  // Tiempo real entre pestañas/dispositivos del mismo navegador
+  window.addEventListener('storage', e => {
+    if (e.key === KEY) { S = load(); refresh(); if (ui.modal !== null) renderProds(); }
+  });
+
+  // Reloj y tiempos de mesa
+  function tick(){
+    $('#clock').textContent = new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+    if (ui.modal === null && ui.tab === 'mesas') renderView();
+  }
+  setInterval(tick, 30000);
+
+  tick(); refresh();
+})();
+</script>
+</body>
+</html>

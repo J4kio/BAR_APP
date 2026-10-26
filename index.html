@@ -105,6 +105,25 @@ details.h td.r,details.h th.r{text-align:right}
 .actions button{flex:1}
 .pay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 
+.paybar{display:flex;gap:10px;flex-wrap:wrap;padding:0 16px 10px;max-width:1300px;margin:0 auto}
+.pay-chip{flex:1;min-width:130px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pay-chip small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.pay-chip b{font-size:15px}
+.wdet{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.wdet summary{cursor:pointer;color:var(--acc);font-weight:700;font-size:14px;padding:4px 0}
+.wdet table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+.wdet th,.wdet td{padding:5px 3px;border-bottom:1px solid var(--line);text-align:left}
+.wdet th.r,.wdet td.r{text-align:right}
+.mtag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--panel2);color:var(--mut)}
+.mtag.Efectivo{background:rgba(34,197,94,.18);color:var(--ok)}
+.mtag.Tarjeta{background:rgba(59,130,246,.2);color:#7aa8ff}
+.mtag.Transferencia{background:rgba(168,85,247,.2);color:#c79bff}
+.mtag.Pendiente{background:rgba(245,165,36,.18);color:var(--acc)}
+.mtag.bad{background:rgba(239,68,68,.18);color:var(--bad)}
+.inv-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.invform{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.invform label{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;display:flex;flex-direction:column;gap:4px}
+.invform .full{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--acc);padding:10px 16px;border-radius:12px;z-index:99;opacity:0;pointer-events:none;transition:.25s}
 .toast.show{opacity:1}
 
@@ -134,10 +153,12 @@ details.h td.r,details.h th.r{text-align:right}
       <div class="kpi big"><small>Total vendido hoy</small><b id="kTotal">$0</b></div>
     </div>
   </div>
+  <div class="paybar" id="payBar"></div>
   <nav id="nav">
     <button data-tab="mesas" class="on">🪑 Mesas</button>
     <button data-tab="meseros">🧑‍🍳 Meseros</button>
     <button data-tab="carta">📋 Carta</button>
+    <button data-tab="inventario">📦 Inventario</button>
     <button data-tab="historial">🧾 Historial</button>
   </nav>
 </header>
@@ -180,7 +201,7 @@ details.h td.r,details.h th.r{text-align:right}
   const DEFAULT_WAITERS = ['Mesero 1', 'Mesero 2', 'Mesero 3'].map(name => ({id: uid(), name}));
 
   let S = load();
-  let ui = {tab:'mesas', modal:null, seller:null, closing:false, search:''};
+  let ui = {tab:'mesas', modal:null, seller:null, closing:false, search:'', openW:{}, invSearch:'', invEdit:null};
 
   function newTable(n){ return {n, waiters:[], items:[], openedAt:null}; }
   function normalize(st){
@@ -189,6 +210,7 @@ details.h td.r,details.h th.r{text-align:right}
     st.tables = st.tables.slice(0, count);
     for (let i = st.tables.length; i < count; i++) st.tables.push(newTable(i + 1));
     st.tableCount = count;
+    st.inventory = st.inventory || [];
     return st;
   }
   function load(){
@@ -208,10 +230,15 @@ details.h td.r,details.h th.r{text-align:right}
   const isBusy = t => t.waiters.length > 0 || t.items.length > 0;
   const waiterName = id => (S.waiters.find(w => w.id === id) || {}).name || 'Ex-mesero';
 
+  const METHODS = ['Efectivo', 'Tarjeta', 'Transferencia'];
+  const METHOD_ICON = {Efectivo:'💵', Tarjeta:'💳', Transferencia:'📲'};
   function totals(){
     const open = S.tables.reduce((a, t) => a + tableTotal(t), 0);
     const closed = S.history.reduce((a, h) => a + h.total, 0);
-    return {open, closed, all: open + closed, openCount: S.tables.filter(isBusy).length};
+    const byMethod = {};
+    METHODS.forEach(m => byMethod[m] = 0);
+    S.history.forEach(h => { byMethod[h.method] = (byMethod[h.method] || 0) + h.total; });
+    return {open, closed, all: open + closed, openCount: S.tables.filter(isBusy).length, byMethod};
   }
   function waiterStats(){
     const m = {};
@@ -238,6 +265,8 @@ details.h td.r,details.h th.r{text-align:right}
     $('#kOpen').textContent = money(t.open);
     $('#kClosed').textContent = money(t.closed);
     $('#kTotal').textContent = money(t.all);
+    $('#payBar').innerHTML = METHODS.map(m =>
+      `<div class="pay-chip"><small>${METHOD_ICON[m]} ${m}</small><b>${money(t.byMethod[m])}</b></div>`).join('');
   }
 
   /* ---------- Render: vistas ---------- */
@@ -247,6 +276,7 @@ details.h td.r,details.h th.r{text-align:right}
     if (ui.tab === 'mesas') v.innerHTML = viewMesas();
     else if (ui.tab === 'meseros') v.innerHTML = viewMeseros();
     else if (ui.tab === 'carta') v.innerHTML = viewCarta();
+    else if (ui.tab === 'inventario') { v.innerHTML = viewInventario(); renderInvList(); }
     else v.innerHTML = viewHistorial();
   }
 
@@ -267,6 +297,33 @@ details.h td.r,details.h th.r{text-align:right}
       <div class="tables">${cards}</div>`;
   }
 
+  function waiterDetail(id){
+    const rows = {}, by = {Pendiente:0};
+    METHODS.forEach(m => by[m] = 0);
+    const add = (i, method) => {
+      const sub = i.price * i.qty;
+      by[method] = (by[method] || 0) + sub;
+      const k = i.name + '|' + method;
+      if (!rows[k]) rows[k] = {name:i.name, method, qty:0, sub:0};
+      rows[k].qty += i.qty; rows[k].sub += sub;
+    };
+    S.history.forEach(h => h.items.forEach(i => { if (i.waiterId === id) add(i, h.method); }));
+    S.tables.forEach(t => t.items.forEach(i => { if (i.waiterId === id) add(i, 'Pendiente'); }));
+    const list = Object.values(rows).sort((a, b) => a.name.localeCompare(b.name) || a.method.localeCompare(b.method));
+    return {rows:list, by};
+  }
+  function waiterDetailHTML(id){
+    const d = waiterDetail(id);
+    if (!d.rows.length) return '<div class="wdet muted" style="font-size:13px">Sin ventas registradas</div>';
+    const methods = [...METHODS, 'Pendiente'].filter(m => d.by[m] > 0).map(m =>
+      `<div class="row"><span class="mtag ${m}">${m === 'Pendiente' ? 'Pendiente (mesa abierta)' : m}</span><b>${money(d.by[m])}</b></div>`).join('');
+    return `<details class="wdet" data-w="${id}" ${ui.openW[id] ? 'open' : ''}><summary>Ver detalle por producto y pago</summary>
+      <div style="margin-top:8px">${methods}</div>
+      <table><tr><th>Producto</th><th>Pago</th><th class="r">Cant.</th><th class="r">Total</th></tr>
+      ${d.rows.map(r => `<tr><td>${esc(r.name)}</td><td><span class="mtag ${r.method}">${r.method}</span></td><td class="r">${r.qty}</td><td class="r">${money(r.sub)}</td></tr>`).join('')}
+      </table></details>`;
+  }
+
   function viewMeseros(){
     const st = waiterStats();
     const cards = S.waiters.map(w => {
@@ -278,6 +335,7 @@ details.h td.r,details.h th.r{text-align:right}
         <div class="row"><span class="muted">En mesas cerradas</span><b>${money(s.closed)}</b></div>
         <div class="row"><span class="muted">Productos vendidos</span><b>${s.items}</b></div>
         <div class="row"><span class="muted">Mesas asignadas</span><b>${s.tables.length ? s.tables.join(', ') : '—'}</b></div>
+        ${waiterDetailHTML(w.id)}
       </div>`;
     }).join('');
     return `<div class="bar"><h2>Meseros</h2></div>
@@ -320,6 +378,60 @@ details.h td.r,details.h th.r{text-align:right}
         <button class="small danger" data-a="newShift">Nueva jornada</button></div></div>
       <p class="muted" style="margin-bottom:12px">Jornada iniciada ${fmtDT(S.shiftStart)} · ${S.history.length} mesas cerradas · ${money(t.closed)} cobrado</p>
       ${list || '<p class="muted">Todavía no se ha cerrado ninguna mesa.</p>'}`;
+  }
+
+  /* ---------- Inventario ---------- */
+  const fmtN = n => (Math.round((n || 0) * 100) / 100).toLocaleString('es-CO');
+  const stockState = i => i.stock <= 0 ? 'out' : (i.min > 0 && i.stock <= i.min ? 'low' : 'ok');
+
+  function viewInventario(){
+    const e = S.inventory.find(x => x.id === ui.invEdit) || null;
+    const val = k => e ? esc(e[k] ?? '') : '';
+    const totalVal = S.inventory.reduce((a, i) => a + i.stock * (i.cost || 0), 0);
+    const alerts = S.inventory.filter(i => stockState(i) !== 'ok').length;
+    return `<div class="bar"><h2>Inventario</h2></div>
+      <div class="inv-sum">
+        <div class="kpi"><small>Productos</small><b>${S.inventory.length}</b></div>
+        <div class="kpi"><small>Valor del inventario</small><b>${money(totalVal)}</b></div>
+        <div class="kpi"><small>Agotados / stock bajo</small><b style="${alerts ? 'color:var(--bad)' : ''}">${alerts}</b></div>
+      </div>
+      <form class="invform" data-form="saveInv">
+        <label>Producto<input name="name" required maxlength="50" value="${val('name')}" placeholder="Ej: Cerveza nacional"></label>
+        <label>Categoría<input name="cat" maxlength="30" value="${val('cat')}" placeholder="Ej: Cervezas"></label>
+        <label>Unidad<input name="unit" maxlength="15" value="${e ? esc(e.unit) : 'und'}" placeholder="und, botella, kg"></label>
+        <label>Cantidad en stock<input name="stock" type="number" step="any" min="0" required value="${e ? e.stock : ''}"></label>
+        <label>Stock mínimo (alerta)<input name="min" type="number" step="any" min="0" value="${e ? e.min : 0}"></label>
+        <label>Costo por unidad<input name="cost" type="number" step="any" min="0" value="${e && e.cost ? e.cost : ''}" placeholder="Opcional"></label>
+        <div class="full">
+          <button class="primary">${e ? 'Guardar cambios' : '+ Crear producto'}</button>
+          ${e ? '<button type="button" data-a="invCancel">Cancelar edición</button>' : ''}
+        </div>
+      </form>
+      <input id="invSearch" placeholder="Buscar en el inventario…" autocomplete="off" value="${esc(ui.invSearch)}" style="margin-bottom:12px">
+      <div id="invList"></div>`;
+  }
+
+  function renderInvList(){
+    const box = $('#invList'); if (!box) return;
+    const q = ui.invSearch.trim().toLowerCase();
+    const list = S.inventory
+      .filter(i => !q || i.name.toLowerCase().includes(q) || (i.cat || '').toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (!list.length) { box.innerHTML = `<p class="muted">${S.inventory.length ? 'Sin resultados.' : 'Aún no hay productos en el inventario. Crea el primero con el formulario de arriba.'}</p>`; return; }
+    box.innerHTML = `<div class="list">${list.map(i => {
+      const st = stockState(i);
+      const tag = st === 'out' ? '<span class="mtag bad">Agotado</span>' : st === 'low' ? '<span class="mtag Pendiente">Stock bajo</span>' : '';
+      return `<div class="item">
+        <div class="l"><b>${esc(i.name)} ${tag}</b>
+          <small>${esc(i.cat || 'General')} · mín. ${fmtN(i.min)} ${esc(i.unit)}${i.cost ? ' · costo ' + money(i.cost) + ' · valor ' + money(i.cost * i.stock) : ''}</small></div>
+        <div class="r">
+          <div class="qty"><button data-a="invDec" data-id="${i.id}">−</button>
+            <b style="min-width:70px;text-align:center;${st !== 'ok' ? 'color:var(--bad)' : ''}">${fmtN(i.stock)} ${esc(i.unit)}</b>
+            <button data-a="invInc" data-id="${i.id}">+</button></div>
+          <button class="small" data-a="invEdit" data-id="${i.id}">Editar</button>
+          <button class="small danger" data-a="invDel" data-id="${i.id}">✕</button>
+        </div></div>`;
+    }).join('')}</div>`;
   }
 
   /* ---------- Modal de mesa ---------- */
@@ -427,6 +539,17 @@ details.h td.r,details.h th.r{text-align:right}
   }
 
   const actions = {
+    invEdit(el){ ui.invEdit = el.dataset.id; refresh(); window.scrollTo({top:0, behavior:'smooth'}); },
+    invCancel(){ ui.invEdit = null; refresh(); },
+    invDel(el){
+      const it = S.inventory.find(x => x.id === el.dataset.id); if (!it) return;
+      if (!confirm(`¿Eliminar "${it.name}" del inventario?`)) return;
+      S.inventory = S.inventory.filter(x => x !== it);
+      if (ui.invEdit === it.id) ui.invEdit = null;
+      save(); refresh();
+    },
+    invInc(el){ const it = S.inventory.find(x => x.id === el.dataset.id); if (it){ it.stock = Math.round((it.stock + 1) * 100) / 100; save(); refresh(); } },
+    invDec(el){ const it = S.inventory.find(x => x.id === el.dataset.id); if (it){ it.stock = Math.max(0, Math.round((it.stock - 1) * 100) / 100); save(); refresh(); } },
     openTable: el => openModal(+el.dataset.n),
     closeModal,
     toggleW(el){
@@ -534,6 +657,7 @@ details.h td.r,details.h th.r{text-align:right}
 
   document.addEventListener('input', e => {
     if (e.target.id === 'mSearch') { ui.search = e.target.value; renderProds(); }
+    if (e.target.id === 'invSearch') { ui.invSearch = e.target.value; renderInvList(); }
   });
 
   document.addEventListener('submit', e => {
@@ -547,6 +671,18 @@ details.h td.r,details.h th.r{text-align:right}
     } else if (kind === 'addProduct') {
       S.menu.push({id: uid(), name, price: Math.max(0, parseInt(d.get('price'), 10) || 0), cat: (d.get('cat') || '').trim() || 'General'});
       toast('Producto agregado');
+    } else if (kind === 'saveInv') {
+      const num = k => Math.max(0, parseFloat(String(d.get(k) || '').replace(',', '.')) || 0);
+      const data = {name, cat:(d.get('cat') || '').trim() || 'General', unit:(d.get('unit') || '').trim() || 'und',
+        stock:num('stock'), min:num('min'), cost:num('cost')};
+      if (ui.invEdit) {
+        const it = S.inventory.find(x => x.id === ui.invEdit);
+        if (it) Object.assign(it, data);
+        ui.invEdit = null; toast('Producto actualizado');
+      } else {
+        S.inventory.push({id: uid(), ...data}); toast('Producto creado en el inventario');
+      }
+      save(); refresh(); return;
     } else if (kind === 'custom') {
       const price = Math.max(0, parseInt(d.get('price'), 10) || 0);
       f.reset(); return addItem(curTable(), {pid: null, name, price});
@@ -555,6 +691,12 @@ details.h td.r,details.h th.r{text-align:right}
   });
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.modal !== null) closeModal(); });
+
+  // Recordar qué detalles de mesero están desplegados
+  document.addEventListener('toggle', e => {
+    const w = e.target.dataset && e.target.dataset.w;
+    if (w) ui.openW[w] = e.target.open;
+  }, true);
 
   // Tiempo real entre pestañas/dispositivos del mismo navegador
   window.addEventListener('storage', e => {
